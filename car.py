@@ -23,39 +23,80 @@ class Rectangle:
       return boundary
 
 class Car(Rectangle):
-   def __init__(self, space, tires = None, turn_tires_idx = None, driven_tires_idx = None):
+   def __init__(self, space, vehicle_chasis, tires = None, turn_tires_idx = None, driven_tires_idx = None):
+      super(Car, self).__init__()
       self.tires = tires
       self.driven_tires = [tires[i] for i in driven_tires_idx]
       self.turn_tires = [tires[i] for i in turn_tires_idx]
       self.legth = 3
       self.width = 2
-      self.weight = 1000
+      self.weight = 20
+      self.wheel_angle = 0
+      self.turning_motors = []
+
+      # create pymunk body and add it to the space
+      self.body = pymunk.Body(self.weight, 200)
+      self.shape = pymunk.Poly(self.body, vehicle_chasis)
+      space.add(self.body, self.shape)
+
+      self.color = (150, 0, 0)
+
+      # attach tires to car
+      for tire in self.tires:
+         constr = pymunk.constraint.PivotJoint(self.body, tire.body, tire.body.local_to_world(tire.body.center_of_gravity))
+         constr.collide_bodies = False
+         constr.max_force = 1000000
+         #constr.max_bias = 1000000
+         space.add(constr)
+
+      # affix non turning wheels (gear joint with chasis)
+      non_turn_tires_idx = [i for i in range(len(tires)) if i not in turn_tires_idx]
+      non_turn_tires = [tires[i] for i in non_turn_tires_idx]
+      for tire in non_turn_tires:
+         constr = pymunk.constraint.GearJoint(self.body, tire.body, 0, 1)
+         space.add(constr)
+
+      # attach turning tires
+      for tire in self.turn_tires:
+         motor = pymunk.constraint.GearJoint(self.body, tire.body, self.wheel_angle, 1)
+         #motor.max_force = 100000
+         space.add(motor)
+         self.turning_motors.append(motor)
+
 
    def drive(self, force):
       for tire in self.driven_tires:
          tire.drive(force)
    
-   def turn(self, force):
-      for tire in self.turn_tires:
-         tire.turn(force)
+   def turn(self, speed):
+      self.wheel_angle += speed/10
+      self.wheel_angle = clamp(self.wheel_angle, -math.pi/4, math.pi/4)
+      # for tire in self.turn_tires:
+      #    tire.turn(force)
 
 
    def update(self):
+
+      for motor in self.turning_motors:
+         motor.phase = self.wheel_angle
+
       for tire in self.tires:
          tire.update()
 
 
 class Tire(Rectangle):
-   def __init__(self, space, width=20, radius = 30, position = [0, 0]):
+   def __init__(self, space, width=20, radius = 30, position = [0, 0], skid_threshold = 100):
       super(Tire, self).__init__()
       self.width = width
       self.radius = radius
       self.angular_velocity = 0
-      self.weight = 10
+      self.weight = 2
+      self.skid = 0
       self.skidding = False
+      self.skid_threshold = skid_threshold
       
       # Create pymunk body and add it to the space
-      self.body = pymunk.Body(self.weight, pymunk.moment_for_box(self.weight, (width, radius*2)))
+      self.body = pymunk.Body(self.weight, 5)
       self.shape = pymunk.Poly.create_box(self.body, (width, radius*2))
       self.body.position = position
 
@@ -66,37 +107,33 @@ class Tire(Rectangle):
       self.body.apply_impulse_at_local_point((force/2, 0), (0, -1))
 
    def drive(self, force):
-      self.body.apply_impulse_at_local_point(Vec2d(0, force), (0, 0))
+      force -= self.get_forward_speed()/2
+      self.body.apply_force_at_local_point(Vec2d(0, force*10), (0, 0))
 
 
    def update(self):
-      #self.body.apply_force_at_local_point(Vec2d(0, -clamp(self.body.velocity.get_length()*500, -1000, 1000)), (0, 0))
-      # if self.body.velocity.get_length() < .01:
-      #    self.body.velocity = (0, 0)
-      #print(self.get_boundary())
-      #print(self.body._get_rotation_vector())
-
-      # Apply rolling resistance
-      forward_vel = self.get_forward_speed()
-      self.body.apply_force_at_local_point((0, -clamp(forward_vel*500, -1000, 1000)), (0, 0))
-      #print(forward_vel)
-
-      # Apply Skidding
+      # Get lateral speed
       lateral_vel = self.get_lateral_speed()
-      lateral_impulse = -clamp(lateral_vel, -20, 20)*self.body.mass
 
-      skid = lateral_impulse + lateral_vel*self.body.mass
-      if abs(skid) < 0.00001:
+      # Calculate impulse to counteract lateral speed up to certain threshold
+      lateral_impulse = -clamp(lateral_vel, -self.skid_threshold, self.skid_threshold)*self.body.mass
+
+      self.skid = lateral_impulse + lateral_vel*self.body.mass
+      if abs(self.skid) < 0.00001:
          self.skidding = False
       else:
          self.skidding = True
+
+      # Apply lateral impulse
       self.body.apply_impulse_at_local_point((lateral_impulse, 0), (0, 0))
 
-      # Apply turning resistance
-      self.turn(-clamp(self.body.angular_velocity*100, -1000, 1000))
+      # Apply rolling resistance
+      forward_vel = self.get_forward_speed()
+      self.body.apply_force_at_local_point((0, -clamp(forward_vel*50, -100, 100)), (0, 0))
+      #print(forward_vel)
 
       # Change color depending on the amount of skid
-      self.color = (clamp(abs(skid)/10, 0, 255), 0, 255)
+      self.color = (clamp(abs(self.skid)/10, 0, 255), 0, 255)
 
 
    def get_forward_speed(self):

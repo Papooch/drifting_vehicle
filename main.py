@@ -17,7 +17,6 @@ def main():
    DISPLAY_W = 800
    DISPLAY_H = 600
 
-
    dt = 1.0/60
    gamedisplay = pygame.display.set_mode((DISPLAY_W, DISPLAY_H))
    pygame.display.set_caption('Car test')
@@ -25,18 +24,18 @@ def main():
    surface = pygame.display.get_surface()
    space = pymunk.Space()
 
-
    keys = []
    buttons = []
 
    gfx = graphics.Graphics(gamedisplay)
-   gfx.zoom = .5
+   gfx.zoom = .2
 
-   tire1 = car.Tire(space, 20, 30, (-50, 0))
-   tire2 = car.Tire(space, 20, 30, (50, 0))
-   tire3 = car.Tire(space, 20, 30, (-50, -100))
-   tire4 = car.Tire(space, 20, 30, (50, -100))
-   vehicle = car.Car(space, [tire1, tire2, tire3, tire4], [0, 1], [2, 3])
+   tire1 = car.Tire(space, 20, 30, (-50, 30), skid_threshold=100)
+   tire2 = car.Tire(space, 20, 30, (50, 30), skid_threshold=100)
+   tire3 = car.Tire(space, 20, 30, (-50, -120), skid_threshold=30)
+   tire4 = car.Tire(space, 20, 30, (50, -120), skid_threshold=30)
+   vehicle_chasis = ((-30, -130), (30, -130), (30, 10), (-30, 10))
+   vehicle = car.Car(space, vehicle_chasis, [tire1, tire2, tire3, tire4], [0, 1], [1, 2])
 
    quit_game = False
 
@@ -69,20 +68,22 @@ def main():
       if pygame.K_ESCAPE in keys:
          quit_game = True
       if pygame.K_UP in keys:
-         vehicle.drive(100)
+         vehicle.drive(1200)
       if pygame.K_DOWN in keys:
-         vehicle.drive(-100)
+         vehicle.drive(-1200)
       if pygame.K_LEFT in keys:
-         vehicle.turn(1000)
+         vehicle.turn(1)
       if pygame.K_RIGHT in keys:
-         vehicle.turn(-1000)
+         vehicle.turn(-1)
 
 
       #DRAWING GRAPHICS
       gamedisplay.fill(COLOR_BLACK)
-      # gamedisplay.clea
       vehicle.update()
-      space.step(dt)
+
+      dt_divider = 1
+      for _ in range(dt_divider):
+         space.step(dt*dt_divider)
       gfx.draw(vehicle)
       gfx.draw_text(f'Speed: {round(tire1.get_forward_speed(), 2)}', (20, 30))
       pygame.display.update()
@@ -91,7 +92,6 @@ def main():
    #end while not quit_game
    pygame.quit()
    quit()
-      
 
 
 if __name__ == "__main__":

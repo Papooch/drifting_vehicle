@@ -16,7 +16,7 @@ class Graphics:
          for tire in obj.tires:
             self.draw(tire)
 
-      if isinstance(obj, car.Tire):
+      if isinstance(obj, car.Rectangle):
          boundary = obj.get_boundary()
          polygon = []
          for v in boundary:

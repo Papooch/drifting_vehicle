@@ -13,7 +13,7 @@ class Rectangle:
       self.body = None
       self.shape = None
       self.color = (0,0,255)
-
+   
    def get_boundary(self):
       boundary = []
       for v in self.shape.get_vertices():
@@ -21,6 +21,24 @@ class Rectangle:
          y = v.rotated(self.shape.body.angle)[1] + self.shape.body.position[1]
          boundary.append((x, y))
       return boundary
+   
+   def get_forward_speed(self):
+      '''Returns the forward speed of the body'''
+      return self.body.velocity.dot(self.body._get_rotation_vector().rotated_degrees(90))
+
+   def get_lateral_speed(self):
+      '''Returns the lateral speed of the body'''
+      return self.body.velocity.dot(self.body._get_rotation_vector())
+      
+
+class Barrier(Rectangle):
+   def __init__(self, space, vertices):
+      super(Barrier, self).__init__()
+      self.color = (120, 120, 120)
+      self.body = pymunk.Body(body_type=pymunk.Body.STATIC)
+      self.shape = pymunk.Poly(self.body, vertices)
+      space.add(self.body, self.shape)
+
 
 class Car(Rectangle):
    def __init__(self, space, vehicle_chasis, tires = None, turn_tires_idx = None, driven_tires_idx = None):
@@ -35,7 +53,7 @@ class Car(Rectangle):
       self.turning_motors = []
 
       # create pymunk body and add it to the space
-      self.body = pymunk.Body(self.weight, 200)
+      self.body = pymunk.Body(self.weight, 1000)
       self.shape = pymunk.Poly(self.body, vehicle_chasis)
       space.add(self.body, self.shape)
 
@@ -45,11 +63,10 @@ class Car(Rectangle):
       for tire in self.tires:
          constr = pymunk.constraint.PivotJoint(self.body, tire.body, tire.body.local_to_world(tire.body.center_of_gravity))
          constr.collide_bodies = False
-         constr.max_force = 1000000
-         #constr.max_bias = 1000000
+         #constr.max_force = 1000000
          space.add(constr)
 
-      # affix non turning wheels (gear joint with chasis)
+      # fix non turning wheels (gear joint with chasis)
       non_turn_tires_idx = [i for i in range(len(tires)) if i not in turn_tires_idx]
       non_turn_tires = [tires[i] for i in non_turn_tires_idx]
       for tire in non_turn_tires:
@@ -59,29 +76,25 @@ class Car(Rectangle):
       # attach turning tires
       for tire in self.turn_tires:
          motor = pymunk.constraint.GearJoint(self.body, tire.body, self.wheel_angle, 1)
-         #motor.max_force = 100000
          space.add(motor)
          self.turning_motors.append(motor)
-
 
    def drive(self, force):
       for tire in self.driven_tires:
          tire.drive(force)
    
    def turn(self, speed):
-      self.wheel_angle += speed/10
-      self.wheel_angle = clamp(self.wheel_angle, -math.pi/4, math.pi/4)
-      # for tire in self.turn_tires:
-      #    tire.turn(force)
-
+      self.wheel_angle += speed
+      self.wheel_angle = clamp(self.wheel_angle, -math.pi/3, math.pi/3)
 
    def update(self):
-
       for motor in self.turning_motors:
          motor.phase = self.wheel_angle
-
       for tire in self.tires:
          tire.update()
+      
+      # slowly return wheels to 0 degrees
+      self.wheel_angle -= math.copysign(clamp(self.wheel_angle, -0.1, 0.1), self.wheel_angle)
 
 
 class Tire(Rectangle):
@@ -91,8 +104,8 @@ class Tire(Rectangle):
       self.radius = radius
       self.angular_velocity = 0
       self.weight = 2
-      self.skid = 0
-      self.skidding = False
+      self.skid = 0           # amount of skidding - the more, the brighter the tire is drawn
+      self.skidding = False   # True if is skidding - used to draw outline around the skidding tire
       self.skid_threshold = skid_threshold
       
       # Create pymunk body and add it to the space
@@ -107,7 +120,7 @@ class Tire(Rectangle):
       self.body.apply_impulse_at_local_point((force/2, 0), (0, -1))
 
    def drive(self, force):
-      force -= self.get_forward_speed()/2
+      force = force*2 - self.get_forward_speed()/4
       self.body.apply_force_at_local_point(Vec2d(0, force*10), (0, 0))
 
 
@@ -133,13 +146,4 @@ class Tire(Rectangle):
       #print(forward_vel)
 
       # Change color depending on the amount of skid
-      self.color = (clamp(abs(self.skid)/10, 0, 255), 0, 255)
-
-
-   def get_forward_speed(self):
-      '''Returns the forward speed of the tire'''
-      return self.body.velocity.dot(self.body._get_rotation_vector().rotated_degrees(90))
-
-   def get_lateral_speed(self):
-      '''Returns the lateral speed of the tire'''
-      return self.body.velocity.dot(self.body._get_rotation_vector())
+      self.color = (clamp(abs(self.skid)/5, 0, 255), 0, 255)

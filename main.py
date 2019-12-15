@@ -14,8 +14,8 @@ def draw():
 
 def main():
 
-   DISPLAY_W = 800
-   DISPLAY_H = 600
+   DISPLAY_W = 1024
+   DISPLAY_H = 720
 
    dt = 1.0/60
    gamedisplay = pygame.display.set_mode((DISPLAY_W, DISPLAY_H))
@@ -28,14 +28,39 @@ def main():
    buttons = []
 
    gfx = graphics.Graphics(gamedisplay)
-   gfx.zoom = .2
 
-   tire1 = car.Tire(space, 20, 30, (-50, 30), skid_threshold=100)
-   tire2 = car.Tire(space, 20, 30, (50, 30), skid_threshold=100)
-   tire3 = car.Tire(space, 20, 30, (-50, -120), skid_threshold=30)
-   tire4 = car.Tire(space, 20, 30, (50, -120), skid_threshold=30)
+   #################################
+   # YOU CAN EDIT THIS
+   # skid_threshold = the higher the harder it is to send the tire sideways (analogous to coefficient of friction)
+
+   gfx.zoom = .4 # also affects the size of the play area
+
+   # Create vehicle
+   tire1 = car.Tire(space, 20, 30, (-50, 30), skid_threshold=180)
+   tire2 = car.Tire(space, 20, 30, (50, 30), skid_threshold=180)
+   tire3 = car.Tire(space, 20, 30, (-50, -120), skid_threshold=80)
+   tire4 = car.Tire(space, 20, 30, (50, -120), skid_threshold=80)
    vehicle_chasis = ((-30, -130), (30, -130), (30, 10), (-30, 10))
-   vehicle = car.Car(space, vehicle_chasis, [tire1, tire2, tire3, tire4], [0, 1], [1, 2])
+   vehicle = car.Car(space, vehicle_chasis, [tire1, tire2, tire3, tire4], turn_tires_idx=[0, 1], driven_tires_idx=[0, 1, 2, 3])
+
+
+   # Create barriers
+   barriers = []
+   z = gfx.zoom
+   b1 = car.Barrier(space, ((-DISPLAY_W/2/z+2, -DISPLAY_H/2/z), (-DISPLAY_W/2/z+2, DISPLAY_H/2/z), (-DISPLAY_W/2/z-200, DISPLAY_H/2/z), (-DISPLAY_W/2/z-200, -DISPLAY_H/2/z)))
+   b21 = car.Barrier(space, ((DISPLAY_W/2/z-2, -DISPLAY_H/2/z), (DISPLAY_W/2/z-2, -100), (DISPLAY_W/2/z+200, -100), (DISPLAY_W/2/z+200, -DISPLAY_H/2/z)))
+   b22 = car.Barrier(space, ((DISPLAY_W/2/z-2, 100), (DISPLAY_W/2/z-2, DISPLAY_H/2/z), (DISPLAY_W/2/z+200, DISPLAY_H/2/z), (DISPLAY_W/2/z+200, 100)))
+   b3 = car.Barrier(space, ((-DISPLAY_W/2/z, -DISPLAY_H/2/z+2), (DISPLAY_W/2/z, -DISPLAY_H/2/z+2), (-DISPLAY_W/2/z, -DISPLAY_H/2/z-200), (DISPLAY_W/2/z, -DISPLAY_H/2/z-200)))
+   b4 = car.Barrier(space, ((-DISPLAY_W/2/z, DISPLAY_H/2/z-2), (DISPLAY_W/2/z, DISPLAY_H/2/z-2), (-DISPLAY_W/2/z, DISPLAY_H/2/z+200), (DISPLAY_W/2/z, DISPLAY_H/2/z+200)))
+   barriers.append(b1)
+   barriers.append(b21)
+   barriers.append(b22)
+   barriers.append(b3)
+   barriers.append(b4)
+   
+
+   # DO NOT EDIT BELOW THIS LINE
+   ###################################
 
    quit_game = False
 
@@ -54,23 +79,19 @@ def main():
                gfx.zoom *= 1.1
             elif event.button == 5: #scroll down
                gfx.zoom *= 1/1.1
-
-         # if event.type == pygame.MOUSEBUTTONUP:
-         #    buttons.remove(event.button)
          if event.type == pygame.MOUSEMOTION:
             if event.buttons[0]:
                gfx.center[0] += event.rel[0]
                gfx.center[1] += event.rel[1]
-         #print(event)
       # end for event
 
-      #GAME LOGIC
+      #GAME LOGIC (input)
       if pygame.K_ESCAPE in keys:
          quit_game = True
       if pygame.K_UP in keys:
-         vehicle.drive(1200)
+         vehicle.drive(1000)
       if pygame.K_DOWN in keys:
-         vehicle.drive(-1200)
+         vehicle.drive(-1000)
       if pygame.K_LEFT in keys:
          vehicle.turn(1)
       if pygame.K_RIGHT in keys:
@@ -82,10 +103,11 @@ def main():
       vehicle.update()
 
       dt_divider = 1
-      for _ in range(dt_divider):
-         space.step(dt*dt_divider)
+      for _ in range(dt_divider): space.step(dt*dt_divider)
+      for barrier in barriers: gfx.draw(barrier)
       gfx.draw(vehicle)
-      gfx.draw_text(f'Speed: {round(tire1.get_forward_speed(), 2)}', (20, 30))
+      gfx.draw_text('Controls: Arrow keys, mouse to pan and zoom', (20, 10))
+      gfx.draw_text(f'Speed: {round(vehicle.get_forward_speed()/10, 2)}', (20, 30))
       pygame.display.update()
       clock.tick(60)
 
